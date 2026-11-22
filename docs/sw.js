@@ -1,6 +1,6 @@
 // 집 알림 서비스 워커: 항상 최신 데이터를 먼저 받고, 인터넷이 안 되면 마지막 저장본을 보여줘요.
-const CACHE = "house-alert-v1";
-const SHELL = ["./", "index.html", "data.json", "manifest.webmanifest", "icon-192.png", "icon-512.png", "apple-touch-icon.png"];
+const CACHE = "house-alert-v2";
+const SHELL = ["./", "index.html", "data.json", "keys.js", "map.js", "manifest.webmanifest", "icon-192.png", "icon-512.png", "apple-touch-icon.png"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

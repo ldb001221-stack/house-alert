@@ -64,6 +64,29 @@ select,.toggle{font:inherit;font-size:13px;padding:6px 10px;border:1px solid var
 .group-label{font-size:12px;color:var(--muted);margin-top:12px;font-weight:600}
 .group-label + .links{margin-top:6px}
 .links a.strong{background:var(--accent);color:var(--surface);border-color:var(--accent)}
+.hm-wrap{grid-column:1/-1;display:flex;flex-direction:column;gap:10px}
+.hm-wrap .filters{margin:0}
+.hm-wrap .summary{margin:0}
+#hmap{width:100%;height:62vh;min-height:360px;border-radius:12px;border:1px solid var(--line);overflow:hidden}
+.hm-pin{background:var(--surface);color:var(--text);border:2px solid var(--accent);border-radius:8px;padding:2px 7px;
+  font-size:12px;font-weight:700;white-space:nowrap;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.25);
+  font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+.hm-pin.k-jeonse{border-color:#2563eb}
+.hm-pin.k-wolse{border-color:#c2410c}
+.hm-dest{background:#1d1c1a;color:#fff;border-radius:8px;padding:3px 8px;font-size:12px;font-weight:700;white-space:nowrap;
+  font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+.hm-deals{display:flex;flex-direction:column;gap:2px;margin-top:8px;font-size:14px}
+.hm-deals .meta{margin-left:6px}
+.hm-commute{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.hm-c{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;font:inherit;font-size:14px;
+  background:var(--surface-2);color:var(--text);border:1px solid transparent;border-radius:8px;padding:10px 12px;cursor:pointer;text-align:left;
+  text-decoration:none;box-sizing:border-box}
+.hm-c:hover{border-color:var(--accent);background:var(--accent-soft)}
+.hm-c.on{border-color:var(--accent);background:var(--accent-soft)}
+.hm-c-l{font-weight:700}
+.hm-c b.ok{color:var(--ok)}
+.hm-c b.late{color:var(--new)}
+.hm-steps{font-size:12px;padding:0 4px 4px}
 .notice{display:flex;flex-direction:column;gap:4px}
 .notice a.title{color:var(--text);font-weight:600;text-decoration:none}
 .notice a.title:hover{text-decoration:underline}
@@ -106,11 +129,14 @@ footer{margin-top:24px;font-size:12px;color:var(--muted)}
   <footer>실거래가는 이미 계약된 거래예요(신고까지 최대 30일 지연). 지금 나와 있는 매물은 네이버부동산 앱 관심지역 알림으로 확인하세요.</footer>
 </div>
 
+<script src="keys.js"></script>
+<script src="map.js"></script>
 <script>
 const TABS = [
   {key:"sale", label:"매매"},
   {key:"jeonse", label:"전세"},
   {key:"wolse", label:"월세"},
+  {key:"map", label:"🗺️ 지도·출근"},
   {key:"notices", label:"LH·SH 공고"},
   {key:"links", label:"🔎 매물 바로가기"},
 ];
@@ -205,7 +231,7 @@ function noticeCard(n){
 
 function renderTabs(){
   $("tabs").innerHTML = TABS.map(t => {
-    if (t.key === "links") return `<button class="tab" role="tab" aria-selected="${t.key === tab}" data-k="${t.key}">${t.label}</button>`;
+    if (t.key === "links" || t.key === "map") return `<button class="tab" role="tab" aria-selected="${t.key === tab}" data-k="${t.key}">${t.label}</button>`;
     const items = (DATA[t.key] || []).filter(x => t.key !== "notices" || x.wanted);
     const nn = items.filter(isNew).length;
     return `<button class="tab" role="tab" aria-selected="${t.key === tab}" data-k="${t.key}">${t.label}<span class="n">${items.length}</span>${nn ? `<span class="nn">+${nn}</span>` : ""}</button>`;
@@ -217,8 +243,8 @@ function renderTabs(){
 }
 
 function fillFilters(){
-  $("filters").hidden = tab === "links";
-  if (tab === "links") return;
+  $("filters").hidden = tab === "links" || tab === "map";
+  if (tab === "links" || tab === "map") return;
   const isN = tab === "notices";
   const items = DATA[tab] || [];
   const regions = [...new Set(items.map(x => isN ? x.source : x.region))];
@@ -231,6 +257,10 @@ function fillFilters(){
 }
 
 function render(){
+  if (tab === "map"){
+    if (window.renderMap) window.renderMap(DATA, $("list"), $("summary"));
+    return;
+  }
   if (tab === "links"){
     $("summary").textContent = "매일 알림 받고 → 역별 버튼으로 지금 나와 있는 매물 확인. 처음 한 번은 각 사이트에서 가격·면적 필터를 맞춰두세요.";
     $("list").innerHTML = STATIONS.map(stationCard).join("");
