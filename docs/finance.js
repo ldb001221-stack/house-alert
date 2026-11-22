@@ -1,7 +1,7 @@
 // 💰 자금 계획: 자기자본·소득을 넣으면 집마다 필요한 대출, LTV, 상품별 한도, 월 상환액을 계산해요.
-// ※ 참고용 계산기예요. 기본값은 2026년 11월 공개 자료를 정리한 값이고, 실제 한도·금리는 심사·시점에 따라 달라져요.
+// ※ 참고용 계산기예요. 한도·금리 기본값은 docs/rates.json (15일마다 자동 갱신)에서 읽어요.
 (function () {
-  const KEY = "ha-fin-v1";
+  const KEY = "ha-fin-v2";
   const DEFAULTS = {
     equity: 0,          // 자기자본 (만원)
     income: 0,          // 연소득, 부부합산 (만원)
@@ -9,19 +9,43 @@
     firstHome: true,    // 생애최초 주택구입
     method: "equal",    // equal 원리금균등 / principal 원금균등 / bullet 만기일시
     years: 30,
-    rateBank: 4.2,      // 시중은행 주담대 금리 (%)
-    stress: 1.5,        // 스트레스 DSR 가산금리 (%p)
-    rateBogeum: 5.0,    // 보금자리론 (%)
-    rateDidim: 3.5,     // 디딤돌 (%)
-    rateJeonse: 4.0,    // 전세자금대출 (%)
+    ov: {},             // 내가 직접 고친 금리 (없으면 rates.json 값 사용)
+  };
+  // rates.json 을 못 읽을 때 쓰는 예비값
+  let R = {
+    updated: "2026-11-22", checked: "2026-11-22",
+    bank: { name: "시중은행 주담대", rate: 4.2, ltv_first: 70, ltv_normal: 40, cap: 60000, dsr: 40, stress: 1.5,
+      note_first: "서울(규제지역) 생애최초 LTV 70% · 6개월 내 전입", note_normal: "서울(규제지역) 무주택 LTV 40%" },
+    bogeum: { name: "보금자리론", rate: 5.0, ltv: 70, cap: 36000, cap_first: 42000, price_max: 60000, income_max: 7000, dti: 60, note: "고정금리 · 주택금융공사" },
+    didim: { name: "디딤돌대출", rate: 3.5, ltv: 70, cap: 20000, cap_first: 24000, price_max: 50000, area_max: 85, income_max: 6000, income_max_first: 7000, dti: 60,
+      note: "무주택 세대주 · 순자산 기준 있음 · 주택도시기금" },
+    jeonse: { rate: 4.0, ratio: 80 },
+  };
+  const RATE_KEYS = {
+    rateBank: () => R.bank.rate, stress: () => R.bank.stress, rateBogeum: () => R.bogeum.rate,
+    rateDidim: () => R.didim.rate, rateJeonse: () => R.jeonse.rate,
   };
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
   function load() {
-    try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) || "{}") }; } catch (e) { return { ...DEFAULTS }; }
+    try {
+      const old = JSON.parse(localStorage.getItem("ha-fin-v1") || "null"); // 이전 버전 개인정보 옮기기
+      const cur = JSON.parse(localStorage.getItem(KEY) || "null");
+      const base = cur || (old ? { equity: old.equity, income: old.income, otherDebt: old.otherDebt, firstHome: old.firstHome, method: old.method, years: old.years } : {});
+      return { ...DEFAULTS, ...base, ov: { ...(base.ov || {}) } };
+    } catch (e) { return { ...DEFAULTS, ov: {} }; }
   }
-  function save(s) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} }
+  function save(s) {
+    const { equity, income, otherDebt, firstHome, method, years, ov } = s;
+    try { localStorage.setItem(KEY, JSON.stringify({ equity, income, otherDebt, firstHome, method, years, ov })); } catch (e) {}
+  }
+  // 실제 계산에 쓰는 금리 = 내가 고친 값 ?? rates.json 값
+  function applyRates() { for (const k in RATE_KEYS) S[k] = k in S.ov ? S.ov[k] : RATE_KEYS[k](); }
   let S = load();
+  applyRates();
+  fetch("rates.json?t=" + Date.now()).then(r => r.json()).then(j => {
+    if (j && j.bank && j.bogeum && j.didim) { R = { ...R, ...j }; applyRates(); document.dispatchEvent(new Event("hafin-change")); }
+  }).catch(() => {});
 
   function money(v) {
     v = Math.round(+v || 0);
@@ -65,27 +89,29 @@
   // ---- 매매 대출 상품 ----
   function products(r) {
     const price = r.price, inc = S.income, first = S.firstHome;
+    const B = R.bank, Q = R.bogeum, D = R.didim;
+    const didimInc = first ? (D.income_max_first || D.income_max) : D.income_max;
     const list = [
       {
-        key: "bank", name: "시중은행 주담대", rate: S.rateBank,
-        ltv: first ? 70 : 40, cap: 60000,
-        limitBy: "DSR 40%", dsrRate: S.rateBank + S.stress, ratio: 0.4,
-        checks: [], note: first ? "서울(규제지역) 생애최초 LTV 70% · 6개월 내 전입" : "서울(규제지역) 무주택 LTV 40%",
+        key: "bank", name: B.name, rate: S.rateBank,
+        ltv: first ? B.ltv_first : B.ltv_normal, cap: B.cap,
+        limitBy: `DSR ${B.dsr}%`, dsrRate: S.rateBank + S.stress, ratio: B.dsr / 100,
+        checks: [], note: first ? B.note_first : B.note_normal,
       },
       {
-        key: "bogeum", name: "보금자리론", rate: S.rateBogeum,
-        ltv: 70, cap: first ? 42000 : 36000,
-        limitBy: "DTI 60%", dsrRate: S.rateBogeum, ratio: 0.6,
-        checks: [[price <= 60000, "주택가격 6억 이하"], [!inc || inc <= 7000, "연소득 7천만원 이하"]],
-        note: "고정금리 · 주택금융공사",
+        key: "bogeum", name: Q.name, rate: S.rateBogeum,
+        ltv: Q.ltv, cap: first ? (Q.cap_first || Q.cap) : Q.cap,
+        limitBy: `DTI ${Q.dti}%`, dsrRate: S.rateBogeum, ratio: Q.dti / 100,
+        checks: [[price <= Q.price_max, `주택가격 ${money(Q.price_max)} 이하`], [!inc || inc <= Q.income_max, `연소득 ${money(Q.income_max)}원 이하`]],
+        note: Q.note,
       },
       {
-        key: "didim", name: "디딤돌대출", rate: S.rateDidim,
-        ltv: 70, cap: first ? 24000 : 20000,
-        limitBy: "DTI 60%", dsrRate: S.rateDidim, ratio: 0.6,
-        checks: [[price <= 50000, "주택가격 5억 이하"], [r.area <= 85, "전용 85㎡ 이하"],
-                 [!inc || inc <= (first ? 7000 : 6000), `연소득 ${first ? "7천" : "6천"}만원 이하`]],
-        note: "무주택 세대주 · 순자산 기준 있음 · 주택도시기금",
+        key: "didim", name: D.name, rate: S.rateDidim,
+        ltv: D.ltv, cap: first ? (D.cap_first || D.cap) : D.cap,
+        limitBy: `DTI ${D.dti}%`, dsrRate: S.rateDidim, ratio: D.dti / 100,
+        checks: [[price <= D.price_max, `주택가격 ${money(D.price_max)} 이하`], [r.area <= D.area_max, `전용 ${D.area_max}㎡ 이하`],
+                 [!inc || inc <= didimInc, `연소득 ${money(didimInc)}원 이하`]],
+        note: D.note,
       },
     ];
     const costs = buyCosts(price, r.area);
@@ -115,7 +141,7 @@
   // ---- 전세 / 월세 ----
   function rentCalc(r) {
     const need = Math.max(0, r.deposit - S.equity);
-    const max = r.deposit * 0.8;
+    const max = r.deposit * (R.jeonse.ratio || 80) / 100;
     const loan = Math.min(need, max);
     return { need, max, loan, short: Math.max(0, need - max), interest: loan * S.rateJeonse / 100 / 12 };
   }
@@ -164,7 +190,7 @@
         ${row("보증금", money(r.deposit))}${r.rent ? row("월세", won(r.rent)) : ""}
         ${row("내 자기자본", money(S.equity))}
         ${row("부족한 보증금", money(c.need), "em")}
-        ${row("전세대출 한도(보증금 80% 가정)", money(c.max))}
+        ${row(`전세대출 한도(보증금 ${R.jeonse.ratio || 80}% 가정)`, money(c.max))}
         ${row("대출 금액", money(c.loan))}
         ${row(`월 이자 (연 ${S.rateJeonse}%, 만기일시)`, won(c.interest))}
         ${row("월 주거비 합계 (이자+월세)", won(c.interest + (r.rent || 0)), "em")}
@@ -204,7 +230,7 @@
       ${res.need === 0 ? `<p>자기자본만으로 살 수 있어요.</p>` : `
       <div class="group-label">상품별 비교 ${b ? `<span class="meta">· 테두리 = 가능한 상품 중 월 상환액이 가장 적은 것</span>` : ""}</div>
       <div class="fin-prods">${cards}</div>`}
-      <p class="fin-note">참고용 계산이에요. 한도·금리는 2026년 11월 공개 자료를 정리한 기본값이고, 실제로는 은행·주택금융공사 심사, 기존 대출, 시세(KB시세 등), 정책 변경에 따라 달라져요.
+      <p class="fin-note">참고용 계산이에요. 한도·금리 기준일 ${esc(R.updated)} (마지막 확인 ${esc(R.checked || R.updated)}, 15일마다 자동 점검)${Object.keys(S.ov).length ? " · 일부 금리는 직접 고친 값" : ""}. 실제로는 은행·주택금융공사 심사, 기존 대출, 시세(KB시세 등), 정책 변경에 따라 달라져요.
       DSR은 기존 대출 연 상환액을 반영하고, 은행 대출은 스트레스 금리(+${S.stress}%p)를 적용했어요.
       신청 전에 <a href="https://www.hf.go.kr" target="_blank" rel="noopener">한국주택금융공사</a>·<a href="https://enhuf.molit.go.kr" target="_blank" rel="noopener">주택도시기금</a>·은행에서 꼭 확인하세요.</p>`;
   }
@@ -228,7 +254,7 @@
           <option value="equal">원리금균등 (매달 같은 금액)</option><option value="principal">원금균등 (처음에 많고 점점 줄어듦)</option><option value="bullet">만기일시 (이자만, 만기에 원금)</option></select></label>
         <label class="fin-f"><span>대출 기간</span><select id="f-years">${[10, 15, 20, 30, 40, 50].map(y => `<option value="${y}">${y}년</option>`).join("")}</select></label>
       </div>
-      <details class="fin-adv"><summary>금리 직접 수정 (기본값: 2026년 11월 공개 자료)</summary>
+      <details class="fin-adv"><summary>금리 직접 수정 (기본값: ${esc(R.updated)} 기준, 15일마다 자동 갱신)</summary>
         <div class="fin-grid">
           ${field("f-rb", "시중은행 주담대", S.rateBank, "%", 'step="0.05"')}
           ${field("f-st", "스트레스 DSR 가산", S.stress, "%p", 'step="0.1"')}
@@ -241,14 +267,16 @@
     d.querySelector("#f-years").value = String(S.years);
     const num = id => Math.max(0, parseFloat(d.querySelector(id).value) || 0);
     d.querySelector("#f-save").onclick = () => {
+      const ov = {};
+      const typed = { rateBank: num("#f-rb"), stress: num("#f-st"), rateBogeum: num("#f-rq"), rateDidim: num("#f-rd"), rateJeonse: num("#f-rj") };
+      for (const k in typed) if (Math.abs(typed[k] - RATE_KEYS[k]()) > 1e-9) ov[k] = typed[k]; // 기본값과 다를 때만 저장
       S = { ...S, equity: num("#f-eq"), income: num("#f-inc"), otherDebt: num("#f-debt"),
         firstHome: d.querySelector("#f-first").checked, method: d.querySelector("#f-method").value,
-        years: +d.querySelector("#f-years").value, rateBank: num("#f-rb"), stress: num("#f-st"),
-        rateBogeum: num("#f-rq"), rateDidim: num("#f-rd"), rateJeonse: num("#f-rj") };
-      save(S); d.close();
+        years: +d.querySelector("#f-years").value, ov };
+      applyRates(); save(S); d.close();
       document.dispatchEvent(new Event("hafin-change"));
     };
-    d.querySelector("#f-reset").onclick = () => { S = { ...DEFAULTS, equity: S.equity, income: S.income, otherDebt: S.otherDebt }; save(S); openSettings(); };
+    d.querySelector("#f-reset").onclick = () => { S.ov = {}; S.method = DEFAULTS.method; S.years = DEFAULTS.years; applyRates(); save(S); openSettings(); };
     d.showModal();
   }
 

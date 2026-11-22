@@ -1,0 +1,52 @@
+{
+  "updated": "2026-11-22",
+  "checked": "2026-11-22",
+  "summary": "초기값: 2026년 11월 공개 자료(언론·정리 글) 기준. 출처마다 차이가 있어 은행·주금공 확인 필요.",
+  "bank": {
+    "name": "시중은행 주담대",
+    "rate": 4.2,
+    "ltv_first": 70,
+    "ltv_normal": 40,
+    "cap": 60000,
+    "dsr": 40,
+    "stress": 1.5,
+    "note_first": "서울(규제지역) 생애최초 LTV 70% · 6개월 내 전입",
+    "note_normal": "서울(규제지역) 무주택 LTV 40%"
+  },
+  "bogeum": {
+    "name": "보금자리론",
+    "rate": 5.0,
+    "ltv": 70,
+    "cap": 36000,
+    "cap_first": 42000,
+    "price_max": 60000,
+    "income_max": 7000,
+    "dti": 60,
+    "note": "고정금리 · 주택금융공사"
+  },
+  "didim": {
+    "name": "디딤돌대출",
+    "rate": 3.5,
+    "ltv": 70,
+    "cap": 20000,
+    "cap_first": 24000,
+    "price_max": 50000,
+    "area_max": 85,
+    "income_max": 6000,
+    "income_max_first": 7000,
+    "dti": 60,
+    "note": "무주택 세대주 · 순자산 기준 있음 · 주택도시기금"
+  },
+  "jeonse": {
+    "rate": 4.0,
+    "ratio": 80
+  },
+  "sources": [
+    "https://www.hankyung.com/article/2025111448861",
+    "https://www.yugacrew.com/crewletter/first-time-buyer-mortgage-ltv",
+    "https://realbuja.com/mortgage-loan-ltv-dsr-2026-guide/",
+    "https://leehaninvest.com/didim-vs-bogeumjari-2026-comparison/",
+    "https://yuksunglife.com/didimdol-loan-guide-2026/",
+    "https://policy.ambitstock.com/posts/didimdol-vs-bogeumjari-compare-2026/"
+  ]
+}
