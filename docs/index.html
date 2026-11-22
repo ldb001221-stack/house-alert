@@ -2,9 +2,17 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>집 알림</title>
 <meta name="robots" content="noindex">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#2f5d50">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="집 알림">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <style>
 :root{
   --bg:#f6f5f2; --surface:#ffffff; --surface-2:#efede8; --text:#1d1c1a; --muted:#6b6862;
@@ -22,7 +30,8 @@
 [hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--text);
   font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;line-height:1.5}
-.wrap{max-width:1080px;margin:0 auto;padding:20px 16px 60px}
+.wrap{max-width:1080px;margin:0 auto;padding:calc(20px + env(safe-area-inset-top)) 16px calc(60px + env(safe-area-inset-bottom))}
+@media (display-mode: standalone){ footer{display:none} }
 header h1{font-size:22px;margin:0 0 2px;letter-spacing:-.3px}
 header .sub{color:var(--muted);font-size:13px}
 .criteria{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 4px}
@@ -272,6 +281,10 @@ function renderHeader(){
   const st = Object.entries(DATA.status || {});
   $("status").innerHTML = st.length ? "수집 상태: " + st.map(([k,v]) =>
     v.ok ? `${esc(k)} ✓` : `<span class="bad">${esc(k)} ✗ (${esc((v.errors||[])[0] || "오류")})</span>`).join(" · ") : "";
+}
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 }
 
 ["f-region","f-type","f-sort","f-new","f-all"].forEach(id => $(id).addEventListener("change", render));
