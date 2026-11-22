@@ -97,8 +97,10 @@
       <div class="row1"><span class="price">${esc(r0.name)}</span><span class="badge type">${esc(r0.htype)}</span></div>
       <div class="meta">${esc(addrOf(r0))} · ${r0.built || "?"}년식</div>
       <div class="meta">🚶 가장 가까운 역: <b>${esc(near.name)}</b> 도보 약 ${walkMin(near.m)}분 (${Math.round(near.m)}m)</div>
-      <div class="hm-deals">${g.items.slice(0, 6).map(r => `<div><b>${esc(KIND_LABEL[r.kind])} ${esc(shortPrice(r))}</b>
-        <span class="meta">${r.pyeong}평 · ${r.floor}층 · ${esc(r.date)}</span></div>`).join("")}
+      <div class="hm-deals">${g.items.slice(0, 6).map((r, i) => `<div><b>${esc(KIND_LABEL[r.kind])} ${esc(shortPrice(r))}</b>
+        <span class="meta">${r.pyeong}평 · ${r.floor}층 · ${esc(r.date)}</span>
+        <button type="button" class="fin-link" data-fin-i="${i}">💰 대출 계산</button>
+        ${window.HAFin ? HAFin.summary(r) : ""}</div>`).join("")}
         ${g.items.length > 6 ? `<div class="meta">…외 ${g.items.length - 6}건</div>` : ""}</div>
       <div class="group-label">출근 경로 보기 (카카오맵 대중교통 길찾기, 이 집 위치에서 출발)</div>
       <div class="hm-commute">${DESTS.map(d => `<a class="hm-c" target="_blank" rel="noopener" href="${routeUrl(r0.name, g.lat, g.lng, d)}">
@@ -109,6 +111,7 @@
         <a target="_blank" rel="noopener" href="https://map.kakao.com/link/roadview/${g.lat},${g.lng}">로드뷰</a>
       </div>`;
     box.hidden = false;
+    box.querySelectorAll("[data-fin-i]").forEach(b => b.onclick = () => HAFin.openDetail(g.items[+b.dataset.finI]));
     if (homeMarker) homeMarker.setMap(null);
     if (walkLine) walkLine.setMap(null);
     const home = new kakao.maps.LatLng(g.lat, g.lng);

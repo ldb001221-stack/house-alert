@@ -87,6 +87,49 @@ select,.toggle{font:inherit;font-size:13px;padding:6px 10px;border:1px solid var
 .hm-c b.ok{color:var(--ok)}
 .hm-c b.late{color:var(--new)}
 .hm-steps{font-size:12px;padding:0 4px 4px}
+.fin-open{margin-top:10px;font:inherit;font-size:14px;font-weight:600;padding:8px 14px;border-radius:10px;cursor:pointer;
+  background:var(--accent);color:var(--surface);border:0}
+.fin-line{margin-top:6px;font-size:13px;font-weight:600;color:var(--accent);background:var(--accent-soft);border-radius:6px;padding:4px 8px}
+.fin-line.warn{color:var(--new);background:var(--new-soft)}
+.fin-link{font:inherit;font-size:12px;color:var(--surface);background:var(--accent);border:1px solid var(--accent);border-radius:6px;padding:3px 8px;cursor:pointer}
+.fin-dialog{border:0;border-radius:14px;padding:0;width:min(640px,calc(100vw - 24px));max-height:calc(100vh - 40px);
+  background:var(--surface);color:var(--text);box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.fin-dialog::backdrop{background:rgba(0,0,0,.45)}
+.fin-dialog > *{margin-left:18px;margin-right:18px}
+.fin-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;position:sticky;top:0;background:var(--surface);
+  padding:16px 0 10px;border-bottom:1px solid var(--line);margin-bottom:10px;z-index:1}
+.fin-x{background:none;border:0;font-size:18px;cursor:pointer;color:var(--muted)}
+.fin-t{width:100%;border-collapse:collapse;font-size:14px;margin:6px 0}
+.fin-t th{text-align:left;font-weight:400;color:var(--muted);padding:5px 0}
+.fin-t td{text-align:right;padding:5px 0}
+.fin-t tr.em td,.fin-t tr.em th{font-weight:700;color:var(--text)}
+.fin-t tr.warn td{color:var(--new);font-weight:700}
+.fin-t.sm{font-size:13px}
+.fin-t tr + tr{border-top:1px dashed var(--line)}
+.fin-prods{display:flex;flex-direction:column;gap:10px;margin:8px 0}
+.fin-prod{border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.fin-prod.best{border:2px solid var(--accent)}
+.fin-prod-h{display:flex;justify-content:space-between;align-items:center}
+.fin-tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px}
+.fin-tag.ok{background:var(--accent-soft);color:var(--accent)}
+.fin-tag.warn{background:var(--new-soft);color:var(--new)}
+.fin-tag.no{background:var(--surface-2);color:var(--muted)}
+.meta.warn{color:var(--new)}
+.fin-note{font-size:12px;color:var(--muted);line-height:1.6;margin:12px 18px 18px}
+.fin-note a{color:var(--accent)}
+.fin-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+@media (max-width:520px){.fin-grid{grid-template-columns:1fr}}
+.fin-f{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+.fin-in{display:flex;align-items:center;gap:6px}
+.fin-in input[type=number]{flex:1;min-width:0;font:inherit;font-size:16px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)}
+.fin-in input[type=checkbox]{width:20px;height:20px}
+.fin-in em{font-style:normal;color:var(--muted)}
+.fin-f select{font-size:15px;padding:8px}
+.fin-adv{margin:6px 18px;font-size:13px}
+.fin-adv summary{cursor:pointer;color:var(--accent)}
+.fin-actions{display:flex;justify-content:flex-end;gap:8px;padding:12px 0 18px}
+.fin-btn{font:inherit;font-size:14px;font-weight:600;padding:9px 18px;border-radius:8px;border:0;background:var(--accent);color:var(--surface);cursor:pointer}
+.fin-btn.ghost{background:var(--surface-2);color:var(--text)}
 .notice{display:flex;flex-direction:column;gap:4px}
 .notice a.title{color:var(--text);font-weight:600;text-decoration:none}
 .notice a.title:hover{text-decoration:underline}
@@ -105,6 +148,7 @@ footer{margin-top:24px;font-size:12px;color:var(--muted)}
     <div class="sub" id="updated">불러오는 중…</div>
     <div id="demo"></div>
     <div class="criteria" id="criteria"></div>
+    <button class="fin-open" id="fin-open" type="button">💰 내 자금 설정</button>
   </header>
 
   <nav class="tabs" role="tablist" id="tabs"></nav>
@@ -131,6 +175,7 @@ footer{margin-top:24px;font-size:12px;color:var(--muted)}
 
 <script src="keys.js"></script>
 <script src="map.js"></script>
+<script src="finance.js"></script>
 <script>
 const TABS = [
   {key:"sale", label:"매매"},
@@ -212,7 +257,9 @@ function dealCard(r){
     <div class="meta">${esc(r.region)} · ${esc(r.dong)} ${esc(r.jibun || "")}</div>
     <div class="meta">${r.pyeong}평 (${r.area}㎡) · ${r.floor}층 · ${r.built || "?"}년식${ppy}</div>
     <div class="meta">계약일 ${esc(r.date)}${r.contract ? " · " + esc(r.contract) : ""}</div>
+    ${window.HAFin ? HAFin.summary(r) : ""}
     <div class="links">
+      <button type="button" class="fin-link" data-fin="${esc(r.id)}">💰 대출 계산</button>
       <a class="strong" target="_blank" rel="noopener" href="https://search.naver.com/search.naver?query=${encodeURIComponent(r.name + " " + (r.kind === "sale" ? "매매" : "전월세") + " 매물")}">이 단지 매물 보기</a>
       <a target="_blank" rel="noopener" href="https://map.naver.com/p/search/${q}">네이버지도</a>
       ${routes}
@@ -312,6 +359,18 @@ function renderHeader(){
   $("status").innerHTML = st.length ? "수집 상태: " + st.map(([k,v]) =>
     v.ok ? `${esc(k)} ✓` : `<span class="bad">${esc(k)} ✗ (${esc((v.errors||[])[0] || "오류")})</span>`).join(" · ") : "";
 }
+
+// 💰 자금 계획 연결
+function finLabel(){ $("fin-open").textContent = HAFin.label(); }
+$("fin-open").onclick = () => HAFin.openSettings();
+document.addEventListener("hafin-change", () => { finLabel(); if (DATA && tab !== "map") render(); });
+$("list").addEventListener("click", e => {
+  const b = e.target.closest("[data-fin]");
+  if (!b || !DATA) return;
+  const r = ["sale","jeonse","wolse"].flatMap(k => DATA[k] || []).find(x => x.id === b.dataset.fin);
+  if (r) HAFin.openDetail(r);
+});
+finLabel();
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
