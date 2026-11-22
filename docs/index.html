@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>집 알림</title>
+<meta name="robots" content="noindex">
+<style>
+:root{
+  --bg:#f6f5f2; --surface:#ffffff; --surface-2:#efede8; --text:#1d1c1a; --muted:#6b6862;
+  --line:#e2dfd8; --accent:#2f5d50; --accent-soft:#e3ece8; --new:#c2410c; --new-soft:#fdeee6;
+  --warn:#9a3412; --ok:#2f5d50; --shadow:0 1px 2px rgba(0,0,0,.05);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#151513; --surface:#1f1e1c; --surface-2:#2a2926; --text:#ecebe7; --muted:#a19e97;
+    --line:#34322e; --accent:#7fb8a6; --accent-soft:#233430; --new:#fb923c; --new-soft:#3a2418;
+    --warn:#fdba74; --ok:#7fb8a6; --shadow:none;
+  }
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;line-height:1.5}
+.wrap{max-width:1080px;margin:0 auto;padding:20px 16px 60px}
+header h1{font-size:22px;margin:0 0 2px;letter-spacing:-.3px}
+header .sub{color:var(--muted);font-size:13px}
+.criteria{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 4px}
+.chip{background:var(--surface-2);border-radius:999px;padding:3px 10px;font-size:12px;color:var(--muted)}
+.chip b{color:var(--text);font-weight:600}
+.tabs{display:flex;gap:4px;margin:18px 0 12px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tab{background:none;border:0;padding:10px 14px;font:inherit;font-size:15px;color:var(--muted);cursor:pointer;
+  border-bottom:2px solid transparent;white-space:nowrap}
+.tab[aria-selected=true]{color:var(--text);border-bottom-color:var(--accent);font-weight:600}
+.tab .n{font-size:12px;margin-left:4px;color:var(--muted)}
+.tab .nn{font-size:11px;margin-left:4px;color:var(--new);font-weight:700}
+.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+select,.toggle{font:inherit;font-size:13px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;
+  background:var(--surface);color:var(--text)}
+.toggle{display:flex;align-items:center;gap:6px;cursor:pointer}
+.summary{font-size:13px;color:var(--muted);margin:0 0 12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;box-shadow:var(--shadow)}
+.card.is-new{border-color:var(--new)}
+.row1{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.price{font-size:20px;font-weight:700;letter-spacing:-.3px}
+.badge{font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px}
+.badge.new{background:var(--new-soft);color:var(--new)}
+.badge.type{background:var(--accent-soft);color:var(--accent)}
+.name{font-weight:600;margin-top:4px}
+.meta{color:var(--muted);font-size:13px}
+.links{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.links a{font-size:12px;color:var(--accent);text-decoration:none;border:1px solid var(--line);border-radius:6px;padding:3px 8px}
+.links a:hover{background:var(--accent-soft)}
+.group-label{font-size:12px;color:var(--muted);margin-top:12px;font-weight:600}
+.group-label + .links{margin-top:6px}
+.links a.strong{background:var(--accent);color:var(--surface);border-color:var(--accent)}
+.notice{display:flex;flex-direction:column;gap:4px}
+.notice a.title{color:var(--text);font-weight:600;text-decoration:none}
+.notice a.title:hover{text-decoration:underline}
+.empty{color:var(--muted);text-align:center;padding:40px 0}
+.status{margin-top:36px;font-size:12px;color:var(--muted)}
+.status .bad{color:var(--warn)}
+.demo{background:var(--new-soft);color:var(--new);padding:8px 12px;border-radius:8px;font-size:13px;margin-top:12px}
+footer{margin-top:24px;font-size:12px;color:var(--muted)}
+@media (max-width:520px){.grid{grid-template-columns:1fr}.price{font-size:18px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🏠 집 알림</h1>
+    <div class="sub" id="updated">불러오는 중…</div>
+    <div id="demo"></div>
+    <div class="criteria" id="criteria"></div>
+  </header>
+
+  <nav class="tabs" role="tablist" id="tabs"></nav>
+
+  <div class="filters" id="filters">
+    <select id="f-region"><option value="">전체 지역</option></select>
+    <select id="f-type"><option value="">전체 유형</option></select>
+    <select id="f-sort">
+      <option value="date">최근 계약순</option>
+      <option value="low">가격 낮은순</option>
+      <option value="high">가격 높은순</option>
+      <option value="area">넓은순</option>
+      <option value="ppy">평당가 낮은순</option>
+    </select>
+    <label class="toggle"><input type="checkbox" id="f-new"> 새 항목만</label>
+    <label class="toggle" id="f-all-wrap" hidden><input type="checkbox" id="f-all"> 발표·결과 공고도 보기</label>
+  </div>
+  <p class="summary" id="summary"></p>
+  <div class="grid" id="list"></div>
+
+  <div class="status" id="status"></div>
+  <footer>실거래가는 이미 계약된 거래예요(신고까지 최대 30일 지연). 지금 나와 있는 매물은 네이버부동산 앱 관심지역 알림으로 확인하세요.</footer>
+</div>
+
+<script>
+const TABS = [
+  {key:"sale", label:"매매"},
+  {key:"jeonse", label:"전세"},
+  {key:"wolse", label:"월세"},
+  {key:"notices", label:"LH·SH 공고"},
+  {key:"links", label:"🔎 매물 바로가기"},
+];
+const STATIONS = [
+  {name:"사당역", lat:37.47653, lon:126.98163, note:"2·4호선 · 신용산/강남 모두 직통"},
+  {name:"낙성대역", lat:37.47693, lon:126.96367, note:"2호선 · 강남 직통"},
+  {name:"서울대입구역", lat:37.48122, lon:126.95270, note:"2호선 · 강남 직통"},
+  {name:"당산역", lat:37.53438, lon:126.90254, note:"2·9호선 · 여의도 가까움"},
+];
+function naverLand(path, types, trade, s){
+  return `https://new.land.naver.com/${path}?ms=${s.lat},${s.lon},16&a=${types}&b=${trade}&e=RETAIL`;
+}
+function stationCard(s){
+  const q = encodeURIComponent(s.name);
+  const L = (href, label) => `<a target="_blank" rel="noopener" href="${href}">${label}</a>`;
+  return `<article class="card">
+    <div class="row1"><span class="price">${esc(s.name)}</span></div>
+    <div class="meta">${esc(s.note)}</div>
+    <div class="group-label">네이버부동산 (역 주변 지도로 바로 열림)</div>
+    <div class="links">
+      ${L(naverLand("complexes","APT:OPST","A1",s), "아파트·오피스텔 매매")}
+      ${L(naverLand("houses","VL","A1",s), "빌라 매매")}
+      ${L(naverLand("complexes","APT:OPST","B1:B2",s), "아파트·오피스텔 전월세")}
+      ${L(naverLand("houses","VL","B1:B2",s), "빌라 전월세")}
+    </div>
+    <div class="group-label">다른 앱 (열고 "${esc(s.name)}" 검색)</div>
+    <div class="links">
+      ${L("https://hogangnono.com/", "호갱노노 (아파트)")}
+      ${L("https://www.zigbang.com/home/villa/map", "직방 빌라·투룸")}
+      ${L("https://www.zigbang.com/home/officetel/map", "직방 오피스텔")}
+      ${L("https://www.dabangapp.com/map/onetwo", "다방")}
+    </div>
+    <div class="group-label">주변 확인</div>
+    <div class="links">
+      ${L(`https://map.naver.com/p/search/${encodeURIComponent(s.name + " 부동산")}`, "주변 중개사무소")}
+      ${L(`https://map.kakao.com/?sName=${q}&eName=${encodeURIComponent("아모레퍼시픽 본사")}`, "→신용산 경로")}
+      ${L(`https://map.kakao.com/?sName=${q}&eName=${encodeURIComponent("강남역")}`, "→강남 경로")}
+    </div>
+  </article>`;
+}
+const WORK = [["신용산","아모레퍼시픽 본사"],["강남","강남역"],["여의도","63빌딩"]];
+let DATA = null;
+let tab = "sale";
+try { tab = localStorage.getItem("ha-tab") || "sale"; } catch(e){}
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function money(v){
+  v = Math.round(+v || 0); const eok = Math.floor(v/10000), man = v % 10000;
+  if (eok && man) return `${eok}억 ${man.toLocaleString()}`;
+  if (eok) return `${eok}억`;
+  return man.toLocaleString();
+}
+const isNew = x => DATA && x.first_seen === DATA.today;
+const priceOf = r => r.kind === "sale" ? r.price : r.deposit + (r.rent || 0) * 100;
+
+function priceText(r){
+  if (r.kind === "sale") return money(r.price);
+  if (r.kind === "jeonse") return "전세 " + money(r.deposit);
+  return `${money(r.deposit)} / ${r.rent}`;
+}
+
+function dealCard(r){
+  const q = encodeURIComponent(`${r.dong} ${r.name}`);
+  const from = encodeURIComponent(`${r.dong} ${r.name}`);
+  const ppy = r.kind === "sale" && r.pyeong ? ` · 평당 ${money(Math.round(r.price / r.pyeong))}` : "";
+  const routes = WORK.map(([label, dest]) =>
+    `<a target="_blank" rel="noopener" href="https://map.kakao.com/?sName=${from}&eName=${encodeURIComponent(dest)}">→${label} 경로</a>`).join("");
+  return `<article class="card ${isNew(r) ? "is-new" : ""}">
+    <div class="row1"><span class="price">${esc(priceText(r))}</span>
+      <span>${isNew(r) ? '<span class="badge new">NEW</span> ' : ""}<span class="badge type">${esc(r.htype)}</span></span></div>
+    <div class="name">${esc(r.name)}</div>
+    <div class="meta">${esc(r.region)} · ${esc(r.dong)} ${esc(r.jibun || "")}</div>
+    <div class="meta">${r.pyeong}평 (${r.area}㎡) · ${r.floor}층 · ${r.built || "?"}년식${ppy}</div>
+    <div class="meta">계약일 ${esc(r.date)}${r.contract ? " · " + esc(r.contract) : ""}</div>
+    <div class="links">
+      <a class="strong" target="_blank" rel="noopener" href="https://search.naver.com/search.naver?query=${encodeURIComponent(r.name + " " + (r.kind === "sale" ? "매매" : "전월세") + " 매물")}">이 단지 매물 보기</a>
+      <a target="_blank" rel="noopener" href="https://map.naver.com/p/search/${q}">네이버지도</a>
+      ${routes}
+    </div>
+  </article>`;
+}
+
+function noticeCard(n){
+  return `<article class="card notice ${isNew(n) ? "is-new" : ""}">
+    <div class="row1"><span><span class="badge type">${esc(n.source)}</span> ${isNew(n) ? '<span class="badge new">NEW</span>' : ""}</span>
+      <span class="meta">${esc(n.date)}</span></div>
+    <a class="title" target="_blank" rel="noopener" href="${esc(n.url)}">${esc(n.title)}</a>
+    <div class="meta">${esc([n.category, n.status, n.deadline ? "마감 " + n.deadline : ""].filter(Boolean).join(" · "))}</div>
+  </article>`;
+}
+
+function renderTabs(){
+  $("tabs").innerHTML = TABS.map(t => {
+    if (t.key === "links") return `<button class="tab" role="tab" aria-selected="${t.key === tab}" data-k="${t.key}">${t.label}</button>`;
+    const items = (DATA[t.key] || []).filter(x => t.key !== "notices" || x.wanted);
+    const nn = items.filter(isNew).length;
+    return `<button class="tab" role="tab" aria-selected="${t.key === tab}" data-k="${t.key}">${t.label}<span class="n">${items.length}</span>${nn ? `<span class="nn">+${nn}</span>` : ""}</button>`;
+  }).join("");
+  $("tabs").querySelectorAll(".tab").forEach(b => b.onclick = () => {
+    tab = b.dataset.k; try { localStorage.setItem("ha-tab", tab); } catch(e){}
+    renderTabs(); fillFilters(); render();
+  });
+}
+
+function fillFilters(){
+  $("filters").hidden = tab === "links";
+  if (tab === "links") return;
+  const isN = tab === "notices";
+  const items = DATA[tab] || [];
+  const regions = [...new Set(items.map(x => isN ? x.source : x.region))];
+  const types = [...new Set(items.map(x => isN ? x.category : x.htype).filter(Boolean))];
+  $("f-region").innerHTML = `<option value="">${isN ? "LH + SH" : "전체 지역"}</option>` + regions.map(r => `<option>${esc(r)}</option>`).join("");
+  $("f-type").innerHTML = `<option value="">전체 유형</option>` + types.map(r => `<option>${esc(r)}</option>`).join("");
+  $("f-type").hidden = isN;
+  $("f-sort").hidden = isN;
+  $("f-all-wrap").hidden = !isN;
+}
+
+function render(){
+  if (tab === "links"){
+    $("summary").textContent = "매일 알림 받고 → 역별 버튼으로 지금 나와 있는 매물 확인. 처음 한 번은 각 사이트에서 가격·면적 필터를 맞춰두세요.";
+    $("list").innerHTML = STATIONS.map(stationCard).join("");
+    return;
+  }
+  const isN = tab === "notices";
+  let items = [...(DATA[tab] || [])];
+  const reg = $("f-region").value, typ = $("f-type").value;
+  if (reg) items = items.filter(x => (isN ? x.source : x.region) === reg);
+  if (typ && !isN) items = items.filter(x => x.htype === typ);
+  if ($("f-new").checked) items = items.filter(isNew);
+  if (isN && !$("f-all").checked) items = items.filter(x => x.wanted);
+  if (!isN){
+    const s = $("f-sort").value;
+    const cmp = {
+      date:(a,b) => b.date.localeCompare(a.date),
+      low:(a,b) => priceOf(a) - priceOf(b),
+      high:(a,b) => priceOf(b) - priceOf(a),
+      area:(a,b) => b.area - a.area,
+      ppy:(a,b) => priceOf(a)/a.pyeong - priceOf(b)/b.pyeong,
+    }[s];
+    items.sort(cmp);
+  }
+  if (!isN && items.length){
+    const ps = items.map(priceOf).sort((a,b) => a-b);
+    const med = ps[Math.floor(ps.length/2)];
+    const label = tab === "wolse" ? "" : ` · 중간값 ${money(med)}`;
+    $("summary").textContent = `${items.length}건${label}`;
+  } else {
+    $("summary").textContent = items.length ? `${items.length}건` : "";
+  }
+  $("list").innerHTML = items.length
+    ? items.map(isN ? noticeCard : dealCard).join("")
+    : `<div class="empty">조건에 맞는 항목이 없어요.</div>`;
+}
+
+function renderHeader(){
+  $("updated").textContent = `마지막 업데이트 ${DATA.updated}`;
+  if (DATA.demo) $("demo").innerHTML = `<div class="demo">지금 보이는 건 예시 데이터예요. 실제 실행 후 진짜 데이터로 바뀝니다.</div>`;
+  const c = DATA.criteria || {};
+  const chips = [
+    ["지역", (c.regions || []).map(r => r.split(" (")[0]).join(", ")],
+    ["유형", (c.house_types || []).join("·")],
+    ["면적", c.min_area], ["층", c.min_floor],
+    ["매매", c.sale], ["전세", c.jeonse], ["월세", c.wolse],
+  ].filter(x => x[1]);
+  $("criteria").innerHTML = chips.map(([k,v]) => `<span class="chip">${k} <b>${esc(v)}</b></span>`).join("");
+  const st = Object.entries(DATA.status || {});
+  $("status").innerHTML = st.length ? "수집 상태: " + st.map(([k,v]) =>
+    v.ok ? `${esc(k)} ✓` : `<span class="bad">${esc(k)} ✗ (${esc((v.errors||[])[0] || "오류")})</span>`).join(" · ") : "";
+}
+
+["f-region","f-type","f-sort","f-new","f-all"].forEach(id => $(id).addEventListener("change", render));
+
+fetch("data.json?t=" + Date.now()).then(r => r.json()).then(d => {
+  DATA = d;
+  if (!TABS.some(t => t.key === tab)) tab = "sale";
+  renderHeader(); renderTabs(); fillFilters(); render();
+}).catch(() => { $("updated").textContent = "데이터를 불러오지 못했어요. 아직 첫 실행 전일 수 있어요."; });
+</script>
+</body>
+</html>
