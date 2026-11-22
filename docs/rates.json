@@ -1,15 +1,15 @@
 {
   "updated": "2026-11-22",
   "checked": "2026-11-22",
-  "summary": "보금자리론 30년 고정금리 5.0% → 5.2% (주택금융공사 2026-11-09부터 0.1%p 인상, 11월 3일 5.10% 기준). 시중은행 주담대는 KB 리뷰상 9월 평균 4.88%로 기존 4.2%보다 높으나 단일 출처라 유지(불확실). 디딤돌·LTV·한도·스트레스 DSR은 공식 확인 불가로 유지.",
+  "summary": "시중은행 주담대 금리 4.2% → 4.9% (한국은행 2026년 9월 가중평균 4.88%, 10월 통계는 11월 말 발표 예정). 수도권·규제지역 스트레스 금리 1.5%p → 3.0%p (2025-10-16 시행, 2026년 하반기에도 유지). 보금자리론 5.2%는 유지, 디딤돌·LTV·한도는 공식 확인 불가로 유지.",
   "bank": {
     "name": "시중은행 주담대",
-    "rate": 4.2,
+    "rate": 4.9,
     "ltv_first": 70,
     "ltv_normal": 40,
     "cap": 60000,
     "dsr": 40,
-    "stress": 1.5,
+    "stress": 3.0,
     "note_first": "서울(규제지역) 생애최초 LTV 70% · 6개월 내 전입",
     "note_normal": "서울(규제지역) 무주택 LTV 40%"
   },
@@ -42,10 +42,11 @@
     "ratio": 80
   },
   "sources": [
-    "https://biz.sbs.co.kr/amp/article/20000343687",
-    "https://newstomato.com/ReadNews.aspx?no=1319208",
-    "https://www.bank-mall.co.kr/plus/blog/12954",
+    "https://m.ceoscoredaily.com/page/view/2026102910141883795",
+    "https://biz.sbs.co.kr/amp/article/20000337490",
+    "https://www.newsis.com/view/NISX20251015_0003363853?pc_view=1",
+    "https://v.daum.net/v/9gu8Ptx2HD",
     "https://www.hf.go.kr/ko/interest-rate-guidance.do",
-    "https://kbthink.com/realestate/insights/research/261116-7.html"
+    "https://newstomato.com/ReadNews.aspx?no=1319208"
   ]
 }
