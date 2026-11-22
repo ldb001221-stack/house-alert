@@ -1,7 +1,7 @@
 {
   "updated": "2026-11-22",
   "checked": "2026-11-22",
-  "summary": "초기값: 2026년 11월 공개 자료(언론·정리 글) 기준. 출처마다 차이가 있어 은행·주금공 확인 필요.",
+  "summary": "보금자리론 30년 고정금리 5.0% → 5.2% (주택금융공사 2026-11-09부터 0.1%p 인상, 11월 3일 5.10% 기준). 시중은행 주담대는 KB 리뷰상 9월 평균 4.88%로 기존 4.2%보다 높으나 단일 출처라 유지(불확실). 디딤돌·LTV·한도·스트레스 DSR은 공식 확인 불가로 유지.",
   "bank": {
     "name": "시중은행 주담대",
     "rate": 4.2,
@@ -15,7 +15,7 @@
   },
   "bogeum": {
     "name": "보금자리론",
-    "rate": 5.0,
+    "rate": 5.2,
     "ltv": 70,
     "cap": 36000,
     "cap_first": 42000,
@@ -42,11 +42,10 @@
     "ratio": 80
   },
   "sources": [
-    "https://www.hankyung.com/article/2025111448861",
-    "https://www.yugacrew.com/crewletter/first-time-buyer-mortgage-ltv",
-    "https://realbuja.com/mortgage-loan-ltv-dsr-2026-guide/",
-    "https://leehaninvest.com/didim-vs-bogeumjari-2026-comparison/",
-    "https://yuksunglife.com/didimdol-loan-guide-2026/",
-    "https://policy.ambitstock.com/posts/didimdol-vs-bogeumjari-compare-2026/"
+    "https://biz.sbs.co.kr/amp/article/20000343687",
+    "https://newstomato.com/ReadNews.aspx?no=1319208",
+    "https://www.bank-mall.co.kr/plus/blog/12954",
+    "https://www.hf.go.kr/ko/interest-rate-guidance.do",
+    "https://kbthink.com/realestate/insights/research/261116-7.html"
   ]
 }
