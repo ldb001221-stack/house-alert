@@ -178,6 +178,8 @@ def to_record(item: ET.Element, htype: str, deal: str, name_fields: list[str], r
     if deal == "trade":
         rec["kind"] = "sale"
         rec["price"] = _num(_txt(item, "dealAmount"), 0)
+        rec["dealing"] = _txt(item, "dealingGbn")              # 중개거래 / 직거래
+        rec["land_lease"] = _txt(item, "landLeaseholdGbn") == "Y"  # 토지임대부 (건물만 분양)
     else:
         rec["deposit"] = _num(_txt(item, "deposit"), 0)
         rec["rent"] = _num(_txt(item, "monthlyRent"), 0)
@@ -205,6 +207,52 @@ def passes(rec: dict, cfg: dict) -> bool:
         return s["enabled"] and rec["deposit"] <= s["max_deposit"]
     s = cfg["wolse"]
     return s["enabled"] and rec["deposit"] <= s["max_deposit"] and rec["rent"] <= s["max_rent"]
+
+
+# 같은 지역·유형 평당가 중간값 대비 이 비율 미만이면 '시세 대비 낮음'.
+# 월세는 보증금·월세 조합이 제각각이라 비교가 부정확해서 판정하지 않아요.
+ODD_RATIO = {"sale": 0.6, "jeonse": 0.5}
+ODD_RATIO_DIRECT = 0.85  # 직거래는 85% 미만이면 이상 거래 (가족·지인 간 저가 거래 의심)
+MIN_GROUP = 5            # 비교 대상이 이보다 적으면 판단하지 않음
+RENT_TO_DEPOSIT = 200    # 월세 1만원 ≈ 보증금 200만원 (전월세 전환율 약 6% 가정)
+
+
+def deal_value(r: dict) -> float:
+    if r["kind"] == "sale":
+        return r["price"]
+    return r["deposit"] + (r.get("rent") or 0) * RENT_TO_DEPOSIT
+
+
+def flag_odd(deals: list[dict]) -> None:
+    """직거래·토지임대부·시세 대비 지나치게 싼 거래에 표시를 붙여요.
+    직거래는 신축 빌라 분양처럼 정상 거래도 많아서, 시세보다 확실히 쌀 때만 이상 거래로 봐요."""
+    import statistics
+    groups: dict = {}
+    for r in deals:
+        r.pop("ratio", None)
+        r["flags"], r["odd"] = [], False
+        if r["pyeong"]:
+            groups.setdefault((r["kind"], r["htype"], r["region"]), []).append(r)
+    for rs in groups.values():
+        base = [deal_value(r) / r["pyeong"] for r in rs if r.get("dealing") != "직거래" and not r.get("land_lease")]
+        med = statistics.median(base) if len(base) >= MIN_GROUP else None
+        for r in rs:
+            ratio = deal_value(r) / r["pyeong"] / med if med else None
+            if ratio is not None and r["kind"] in ODD_RATIO:
+                r["ratio"] = round(ratio, 2)
+            direct = r.get("dealing") == "직거래"
+            if direct:
+                r["flags"].append("직거래")
+            if r.get("land_lease"):
+                r["flags"].append("토지임대부")
+                r["odd"] = True
+            limit = ODD_RATIO.get(r["kind"])
+            if ratio is not None and limit and ratio < limit:
+                r["flags"].append("시세 대비 낮음")
+                r["odd"] = True
+            elif direct and ratio is not None and ratio < ODD_RATIO_DIRECT:
+                r["flags"].append("시세보다 싼 직거래")
+                r["odd"] = True
 
 
 def collect_deals(cfg: dict, key: str, status: dict) -> list[dict]:
@@ -408,6 +456,8 @@ def build_message(new: dict[str, list], secrets: dict, cfg: dict, status: dict, 
                 lines.append(f"• [{n['source']}] <a href=\"{html.escape(n['url'])}\">{html.escape(n['title'])}</a>")
         if not any_new:
             lines.append("오늘은 조건에 맞는 새 항목이 없어요.")
+        if new.get("odd"):
+            lines += ["", f"<i>직거래·시세 대비 지나치게 싼 거래 {len(new['odd'])}건은 알림에서 뺐어요 (웹사이트에서 '이상 거래 보기'로 확인)</i>"]
     errs = [f"{k}: {v.get('error_count', 1)}건 오류" for k, v in status.items() if not v.get("ok")]
     if errs:
         lines += ["", "⚠️ 일부 수집 실패 — " + ", ".join(errs)]
@@ -497,12 +547,13 @@ def run(send_telegram: bool = True) -> None:
         if src in status and not status[src]["ok"] and prev and not prev.get("demo"):
             notices += [n for n in prev.get("notices", []) if n["source"] == src]
 
-    new: dict[str, list] = {"sale": [], "jeonse": [], "wolse": [], "notices": []}
+    flag_odd(deals)
+    new: dict[str, list] = {"sale": [], "jeonse": [], "wolse": [], "notices": [], "odd": []}
     for r in deals:
         r["first_seen"] = seen.get(r["id"], mark)
         if r["id"] not in seen:
             seen[r["id"]] = mark
-            new[r["kind"]].append(r)
+            new["odd" if r["odd"] else r["kind"]].append(r)
     for n in notices:
         n["wanted"] = notice_wanted(n, cfg)
         n["first_seen"] = seen.get(n["id"], mark)
