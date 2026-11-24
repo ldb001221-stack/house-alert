@@ -98,6 +98,7 @@
       <div class="meta">${esc(addrOf(r0))} · ${r0.built || "?"}년식</div>
       <div class="meta">🚶 가장 가까운 역: <b>${esc(near.name)}</b> 도보 약 ${walkMin(near.m)}분 (${Math.round(near.m)}m)</div>
       <div class="hm-deals">${g.items.slice(0, 6).map((r, i) => `<div><b>${esc(KIND_LABEL[r.kind])} ${esc(shortPrice(r))}</b>
+        ${r.odd ? `<span class="meta warn">⚠️ ${esc(r.flags.join("·"))}</span>` : ""}
         <span class="meta">${r.pyeong}평 · ${r.floor}층 · ${esc(r.date)}</span>
         <button type="button" class="fin-link" data-fin-i="${i}">💰 대출 계산</button>
         ${window.HAFin ? HAFin.summary(r) : ""}</div>`).join("")}
@@ -123,7 +124,10 @@
 
   function groups(DATA) {
     const kinds = state.kind ? [state.kind] : ["sale", "jeonse", "wolse"];
-    const items = kinds.flatMap(k => DATA[k] || []).filter(r => !state.htype || r.htype === state.htype);
+    const showOdd = window.HA_SHOW_ODD ? window.HA_SHOW_ODD() : false;
+    const items = kinds.flatMap(k => DATA[k] || [])
+      .filter(r => !state.htype || r.htype === state.htype)
+      .filter(r => showOdd || !r.odd);
     const by = {};
     items.forEach(r => { const a = addrOf(r) + "|" + r.name; (by[a] = by[a] || { items: [] }).items.push(r); });
     Object.values(by).forEach(g => g.items.sort((a, b) => b.date.localeCompare(a.date)));
@@ -164,6 +168,7 @@
       <div class="filters">
         <select id="m-kind"><option value="sale">매매</option><option value="jeonse">전세</option><option value="wolse">월세</option><option value="">전체</option></select>
         <select id="m-type"><option value="">전체 유형</option>${types.map(t => `<option>${esc(t)}</option>`).join("")}</select>
+        <label class="toggle"><input type="checkbox" id="m-odd"> ⚠️ 이상 거래 보기</label>
       </div>
       <p class="summary" id="map-status">지도 불러오는 중…</p>
       <div id="hmap"></div>
@@ -192,6 +197,12 @@
     };
     document.getElementById("m-kind").onchange = onChange;
     document.getElementById("m-type").onchange = onChange;
+    const mOdd = document.getElementById("m-odd"), fOdd = document.getElementById("f-odd");
+    if (fOdd) mOdd.checked = fOdd.checked;
+    mOdd.onchange = () => {
+      if (fOdd) { fOdd.checked = mOdd.checked; try { localStorage.setItem("ha-odd", mOdd.checked ? "1" : "0"); } catch (e) {} }
+      onChange();
+    };
     plot(DATA);
   };
 })();

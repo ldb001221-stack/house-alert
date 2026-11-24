@@ -130,6 +130,9 @@ select,.toggle{font:inherit;font-size:13px;padding:6px 10px;border:1px solid var
 .fin-actions{display:flex;justify-content:flex-end;gap:8px;padding:12px 0 18px}
 .fin-btn{font:inherit;font-size:14px;font-weight:600;padding:9px 18px;border-radius:8px;border:0;background:var(--accent);color:var(--surface);cursor:pointer}
 .fin-btn.ghost{background:var(--surface-2);color:var(--text)}
+.odd-note{margin-top:6px;font-size:12px;font-weight:700;color:var(--warn);background:var(--new-soft);border-radius:6px;padding:4px 8px}
+.odd-note .meta{display:block;font-weight:400;color:var(--muted)}
+.card.is-odd{opacity:.85;border-style:dashed}
 .notice{display:flex;flex-direction:column;gap:4px}
 .notice a.title{color:var(--text);font-weight:600;text-decoration:none}
 .notice a.title:hover{text-decoration:underline}
@@ -164,6 +167,7 @@ footer{margin-top:24px;font-size:12px;color:var(--muted)}
       <option value="ppy">평당가 낮은순</option>
     </select>
     <label class="toggle"><input type="checkbox" id="f-new"> 새 항목만</label>
+    <label class="toggle" id="f-odd-wrap"><input type="checkbox" id="f-odd"> ⚠️ 이상 거래 보기</label>
     <label class="toggle" id="f-all-wrap" hidden><input type="checkbox" id="f-all"> 발표·결과 공고도 보기</label>
   </div>
   <p class="summary" id="summary"></p>
@@ -250,9 +254,10 @@ function dealCard(r){
   const ppy = r.kind === "sale" && r.pyeong ? ` · 평당 ${money(Math.round(r.price / r.pyeong))}` : "";
   const routes = WORK.map(([label, dest]) =>
     `<a target="_blank" rel="noopener" href="https://map.kakao.com/?sName=${from}&eName=${encodeURIComponent(dest)}">→${label} 경로</a>`).join("");
-  return `<article class="card ${isNew(r) ? "is-new" : ""}">
+  return `<article class="card ${isNew(r) ? "is-new" : ""} ${r.odd ? "is-odd" : ""}">
     <div class="row1"><span class="price">${esc(priceText(r))}</span>
       <span>${isNew(r) ? '<span class="badge new">NEW</span> ' : ""}<span class="badge type">${esc(r.htype)}</span></span></div>
+    ${oddNote(r)}
     <div class="name">${esc(r.name)}</div>
     <div class="meta">${esc(r.region)} · ${esc(r.dong)} ${esc(r.jibun || "")}</div>
     <div class="meta">${r.pyeong}평 (${r.area}㎡) · ${r.floor}층 · ${r.built || "?"}년식${ppy}</div>
@@ -267,6 +272,25 @@ function dealCard(r){
   </article>`;
 }
 
+// ⚠️ 이상 거래 (직거래·토지임대부·시세 대비 지나치게 쌈)
+const ODD_HELP = {
+  "직거래": "중개사 없이 거래 — 신축 빌라 분양에 흔하지만, 가족·지인 간 거래일 수도 있어요",
+  "시세보다 싼 직거래": "시세보다 싸게 직거래 — 가족·지인 간 거래일 가능성이 커서 시세로 보기 어려워요",
+  "토지임대부": "땅은 빼고 건물만 분양한 주택이라 매우 저렴해요",
+  "시세 대비 낮음": "같은 지역·유형 평당가보다 크게 낮아요 — 신고 오류, 특수 관계, 하자 가능성",
+};
+const showOdd = () => $("f-odd").checked;
+try { $("f-odd").checked = localStorage.getItem("ha-odd") === "1"; } catch(e){}
+window.HA_SHOW_ODD = () => showOdd();
+function oddNote(r){
+  if (!r.flags || !r.flags.length) return "";
+  const pct = r.ratio ? ` (시세 대비 ${Math.round(r.ratio * 100)}%)` : "";
+  if (!r.odd) return `<div class="meta">ℹ️ ${esc(r.flags.join(" · "))}${pct} — 신축 분양 등 정상 거래일 가능성이 커요</div>`;
+  const main = r.flags.filter(f => f !== "직거래");
+  const why = ODD_HELP[main[main.length - 1]] || ODD_HELP[r.flags[0]] || "";
+  return `<div class="odd-note">⚠️ ${esc(main.join(" · "))}${pct}<span class="meta">${esc(why)}</span></div>`;
+}
+
 function noticeCard(n){
   return `<article class="card notice ${isNew(n) ? "is-new" : ""}">
     <div class="row1"><span><span class="badge type">${esc(n.source)}</span> ${isNew(n) ? '<span class="badge new">NEW</span>' : ""}</span>
@@ -279,7 +303,7 @@ function noticeCard(n){
 function renderTabs(){
   $("tabs").innerHTML = TABS.map(t => {
     if (t.key === "links" || t.key === "map") return `<button class="tab" role="tab" aria-selected="${t.key === tab}" data-k="${t.key}">${t.label}</button>`;
-    const items = (DATA[t.key] || []).filter(x => t.key !== "notices" || x.wanted);
+    const items = (DATA[t.key] || []).filter(x => t.key !== "notices" ? (showOdd() || !x.odd) : x.wanted);
     const nn = items.filter(isNew).length;
     return `<button class="tab" role="tab" aria-selected="${t.key === tab}" data-k="${t.key}">${t.label}<span class="n">${items.length}</span>${nn ? `<span class="nn">+${nn}</span>` : ""}</button>`;
   }).join("");
@@ -301,6 +325,7 @@ function fillFilters(){
   $("f-type").hidden = isN;
   $("f-sort").hidden = isN;
   $("f-all-wrap").hidden = !isN;
+  $("f-odd-wrap").hidden = isN;
 }
 
 function render(){
@@ -320,6 +345,8 @@ function render(){
   if (typ && !isN) items = items.filter(x => x.htype === typ);
   if ($("f-new").checked) items = items.filter(isNew);
   if (isN && !$("f-all").checked) items = items.filter(x => x.wanted);
+  const hiddenOdd = isN || showOdd() ? 0 : items.filter(x => x.odd).length;
+  if (!isN && !showOdd()) items = items.filter(x => !x.odd);
   if (!isN){
     const s = $("f-sort").value;
     const cmp = {
@@ -332,10 +359,10 @@ function render(){
     items.sort(cmp);
   }
   if (!isN && items.length){
-    const ps = items.map(priceOf).sort((a,b) => a-b);
+    const ps = items.filter(x => !x.odd).map(priceOf).sort((a,b) => a-b);
     const med = ps[Math.floor(ps.length/2)];
-    const label = tab === "wolse" ? "" : ` · 중간값 ${money(med)}`;
-    $("summary").textContent = `${items.length}건${label}`;
+    const label = tab === "wolse" || !ps.length ? "" : ` · 중간값 ${money(med)}`;
+    $("summary").textContent = `${items.length}건${label}${hiddenOdd ? ` · 이상 거래 ${hiddenOdd}건 숨김` : ""}`;
   } else {
     $("summary").textContent = items.length ? `${items.length}건` : "";
   }
@@ -377,6 +404,10 @@ if ("serviceWorker" in navigator) {
 }
 
 ["f-region","f-type","f-sort","f-new","f-all"].forEach(id => $(id).addEventListener("change", render));
+$("f-odd").addEventListener("change", () => {
+  try { localStorage.setItem("ha-odd", showOdd() ? "1" : "0"); } catch(e){}
+  renderTabs(); render();
+});
 
 fetch("data.json?t=" + Date.now()).then(r => r.json()).then(d => {
   DATA = d;
