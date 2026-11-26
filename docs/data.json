@@ -1,6 +1,6 @@
 {
- "updated": "2026-11-25 16:50",
- "today": "2026-11-25",
+ "updated": "2026-11-26 16:41",
+ "today": "2026-11-26",
  "criteria": {
   "regions": [
    "서울대입구·낙성대 (관악구)",
@@ -266,6 +266,27 @@
    "odd": false,
    "ratio": 1.09,
    "first_seen": "2026-11-21"
+  },
+  {
+   "htype": "빌라",
+   "region": "당산 (영등포구)",
+   "dong": "당산동1가",
+   "name": "다솔시티하임",
+   "jibun": "143",
+   "area": 29.12,
+   "pyeong": 8.8,
+   "floor": 6,
+   "built": 2017,
+   "date": "2026-11-09",
+   "kind": "sale",
+   "price": 47000,
+   "dealing": "중개거래",
+   "land_lease": false,
+   "id": "sale|빌라|11560|당산동1가|143|다솔시티하임|29.12|6|2026-11-09|47000",
+   "flags": [],
+   "odd": false,
+   "ratio": 1.15,
+   "first_seen": "2026-11-26"
   },
   {
    "htype": "빌라",
@@ -731,7 +752,7 @@
    "id": "sale|빌라|11560|당산동1가|186-99|파비엥노블레스103동|29.91|4|2026-10-31|41800",
    "flags": [],
    "odd": false,
-   "ratio": 1.01,
+   "ratio": 1.0,
    "first_seen": "2026-11-21"
   },
   {
@@ -2237,7 +2258,7 @@
    "id": "sale|빌라|11560|당산동1가|232|에코하우징|26.58|2|2026-09-30|45000",
    "flags": [],
    "odd": false,
-   "ratio": 1.22,
+   "ratio": 1.21,
    "first_seen": "2026-11-21"
   },
   {
@@ -2344,7 +2365,7 @@
    "id": "sale|빌라|11560|당산동1가|232|에코하우징|26.58|3|2026-09-29|42000",
    "flags": [],
    "odd": false,
-   "ratio": 1.14,
+   "ratio": 1.13,
    "first_seen": "2026-11-21"
   },
   {
@@ -4332,6 +4353,26 @@
   },
   {
    "htype": "빌라",
+   "region": "사당 (동작구)",
+   "dong": "사당동",
+   "name": "더불어가",
+   "jibun": "183-20",
+   "area": 28.09,
+   "pyeong": 8.5,
+   "floor": 3,
+   "built": 2023,
+   "date": "2026-11-13",
+   "deposit": 2395,
+   "rent": 25,
+   "kind": "wolse",
+   "contract": "신규",
+   "id": "wolse|빌라|11590|사당동|183-20|더불어가|28.09|3|2026-11-13|2395/25",
+   "flags": [],
+   "odd": false,
+   "first_seen": "2026-11-26"
+  },
+  {
+   "htype": "빌라",
    "region": "서울대입구·낙성대 (관악구)",
    "dong": "봉천동",
    "name": "ACOCITY서울대입구역",
@@ -4429,6 +4470,26 @@
    "flags": [],
    "odd": false,
    "first_seen": "2026-11-21"
+  },
+  {
+   "htype": "빌라",
+   "region": "서울대입구·낙성대 (관악구)",
+   "dong": "봉천동",
+   "name": "드림빌(65-6)",
+   "jibun": "65-6",
+   "area": 49.75,
+   "pyeong": 15.0,
+   "floor": 5,
+   "built": 2008,
+   "date": "2026-11-11",
+   "deposit": 2000,
+   "rent": 64,
+   "kind": "wolse",
+   "contract": "신규",
+   "id": "wolse|빌라|11620|봉천동|65-6|드림빌(65-6)|49.75|5|2026-11-11|2000/64",
+   "flags": [],
+   "odd": false,
+   "first_seen": "2026-11-26"
   },
   {
    "htype": "빌라",
@@ -6472,6 +6533,26 @@
   },
   {
    "htype": "빌라",
+   "region": "사당 (동작구)",
+   "dong": "사당동",
+   "name": "더불어가",
+   "jibun": "183-20",
+   "area": 28.09,
+   "pyeong": 8.5,
+   "floor": 4,
+   "built": 2023,
+   "date": "2026-09-11",
+   "deposit": 2425,
+   "rent": 25,
+   "kind": "wolse",
+   "contract": "신규",
+   "id": "wolse|빌라|11590|사당동|183-20|더불어가|28.09|4|2026-09-11|2425/25",
+   "flags": [],
+   "odd": false,
+   "first_seen": "2026-11-26"
+  },
+  {
+   "htype": "빌라",
    "region": "서울대입구·낙성대 (관악구)",
    "dong": "남현동",
    "name": "602-365",
@@ -6693,9 +6774,48 @@
  ],
  "notices": [
   {
+   "id": "SH|313945",
+   "source": "SH",
+   "title": "NEW  고덕강일지구 3단지 토지임대부 분양주택 본청약 당첨자 발표 및 서류제출 안내",
+   "category": "분양부",
+   "status": "",
+   "date": "2026-11-26",
+   "deadline": "",
+   "region": "서울",
+   "url": "https://www.i-sh.co.kr/main/lay2/program/S1T294C297/www/brd/m_247/view.do?seq=313945",
+   "wanted": false,
+   "first_seen": "2026-11-26"
+  },
+  {
+   "id": "SH|313923",
+   "source": "SH",
+   "title": "NEW  [힐스테이트동작시그니처] 사용검사 확인증 게시",
+   "category": "관악주거안심종합센터",
+   "status": "",
+   "date": "2026-11-26",
+   "deadline": "",
+   "region": "서울",
+   "url": "https://www.i-sh.co.kr/main/lay2/program/S1T294C297/www/brd/m_247/view.do?seq=313923",
+   "wanted": false,
+   "first_seen": "2026-11-26"
+  },
+  {
+   "id": "SH|313957",
+   "source": "SH",
+   "title": "NEW  [취소공고] 고덕강일 단지 및 서초선포레 내 상가 매각 공고",
+   "category": "복합시설운영관리부",
+   "status": "",
+   "date": "2026-11-26",
+   "deadline": "",
+   "region": "서울",
+   "url": "https://www.i-sh.co.kr/main/lay2/program/S1T294C297/www/brd/m_247/view.do?seq=313957",
+   "wanted": false,
+   "first_seen": "2026-11-26"
+  },
+  {
    "id": "SH|313843",
    "source": "SH",
-   "title": "NEW  2026년 제2차 보증금지원형 장기안심주택 입주자 모집공고",
+   "title": "2026년 제2차 보증금지원형 장기안심주택 입주자 모집공고",
    "category": "맞춤주택공급부",
    "status": "",
    "date": "2026-11-25",
@@ -6794,45 +6914,6 @@
    "region": "서울",
    "url": "https://www.i-sh.co.kr/main/lay2/program/S1T294C297/www/brd/m_247/view.do?seq=313552",
    "wanted": false,
-   "first_seen": "2026-11-23"
-  },
-  {
-   "id": "SH|313792",
-   "source": "SH",
-   "title": "선택적 복지제도 시스템 운영 사업자 선정",
-   "category": "노사협력부",
-   "status": "",
-   "date": "2026-11-23",
-   "deadline": "",
-   "region": "서울",
-   "url": "https://www.i-sh.co.kr/main/lay2/program/S1T294C297/www/brd/m_247/view.do?seq=313792",
-   "wanted": false,
-   "first_seen": "2026-11-24"
-  },
-  {
-   "id": "SH|313791",
-   "source": "SH",
-   "title": "선택적 복지제도 복지카드사 선정",
-   "category": "노사협력부",
-   "status": "",
-   "date": "2026-11-23",
-   "deadline": "",
-   "region": "서울",
-   "url": "https://www.i-sh.co.kr/main/lay2/program/S1T294C297/www/brd/m_247/view.do?seq=313791",
-   "wanted": false,
-   "first_seen": "2026-11-24"
-  },
-  {
-   "id": "SH|313481",
-   "source": "SH",
-   "title": "[청년형] 특화형 매입임대주택(서초구) 입주자 모집 공고(운영기관 : 마을과집 협동조합)",
-   "category": "매입주택공급부",
-   "status": "",
-   "date": "2026-11-23",
-   "deadline": "",
-   "region": "서울",
-   "url": "https://www.i-sh.co.kr/main/lay2/program/S1T294C297/www/brd/m_247/view.do?seq=313481",
-   "wanted": true,
    "first_seen": "2026-11-23"
   },
   {
