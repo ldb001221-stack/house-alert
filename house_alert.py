@@ -540,11 +540,19 @@ def tg_call(token: str, method: str, params: dict) -> dict:
     data = urllib.parse.urlencode(params).encode()
     req = urllib.request.Request(f"https://api.telegram.org/bot{token}/{method}", data=data,
                                  headers={"User-Agent": UA})
-    try:
-        with urllib.request.urlopen(req, timeout=30) as r:
-            return json.loads(r.read().decode())
-    except urllib.error.HTTPError as e:
-        return json.loads(e.read().decode() or "{}")
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return json.loads(r.read().decode())
+        except urllib.error.HTTPError as e:
+            try:
+                return json.loads(e.read().decode() or "{}")
+            except Exception:
+                return {"ok": False, "description": f"HTTP {e.code}"}
+        except Exception as e:   # 네트워크 일시 오류로 전체 실행이 멈추지 않게
+            last = e
+            time.sleep(3 + attempt * 5)
+    return {"ok": False, "description": f"접속 실패: {last}"}
 
 
 SILENT = False   # --silent: 소리 없이 알림 (밤에 수동 실행할 때)
@@ -884,6 +892,7 @@ if __name__ == "__main__":
     except Exception:
         pass
     args = set(sys.argv[1:])
+    SILENT = "--silent" in args
     if "--demo" in args:
         demo()
     elif "--find-chat-id" in args:
@@ -891,5 +900,4 @@ if __name__ == "__main__":
     elif "--telegram-test" in args:
         tg_send(load_secrets(), "✅ 집 알림 봇 연결 성공!")
     else:
-        SILENT = "--silent" in args
         run(send_telegram="--no-telegram" not in args)
