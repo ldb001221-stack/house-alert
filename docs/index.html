@@ -130,6 +130,17 @@ select,.toggle{font:inherit;font-size:13px;padding:6px 10px;border:1px solid var
 .fin-actions{display:flex;justify-content:flex-end;gap:8px;padding:12px 0 18px}
 .fin-btn{font:inherit;font-size:14px;font-weight:600;padding:9px 18px;border-radius:8px;border:0;background:var(--accent);color:var(--surface);cursor:pointer}
 .fin-btn.ghost{background:var(--surface-2);color:var(--text)}
+.yt-wrap{grid-column:1/-1;display:flex;flex-direction:column;gap:12px}
+.yt-wrap .filters{margin:0}
+.yt-guide{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.yt-guide h3{margin:0 0 8px;font-size:16px}
+.yt-progs{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin-top:10px}
+.yt-prog{border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px}
+.yt-prog ul,.yt-check{margin:6px 0;padding-left:18px;font-size:13px;line-height:1.6}
+.yt-prog a,.yt-guide a{color:var(--accent)}
+.yt-guide .fin-t td{text-align:left;padding:5px 6px;vertical-align:top}
+.yt-guide .fin-t th{vertical-align:top;white-space:nowrap;padding-right:8px}
+.yt-guide .fin-note{margin:12px 0 0}
 .odd-note{margin-top:6px;font-size:12px;font-weight:700;color:var(--warn);background:var(--new-soft);border-radius:6px;padding:4px 8px}
 .odd-note .meta{display:block;font-weight:400;color:var(--muted)}
 .card.is-odd{opacity:.85;border-style:dashed}
@@ -180,12 +191,16 @@ footer{margin-top:24px;font-size:12px;color:var(--muted)}
 <script src="keys.js"></script>
 <script src="map.js"></script>
 <script src="finance.js"></script>
+<script src="youth.js"></script>
+<script src="auction.js"></script>
 <script>
 const TABS = [
   {key:"sale", label:"매매"},
   {key:"jeonse", label:"전세"},
   {key:"wolse", label:"월세"},
   {key:"map", label:"🗺️ 지도·출근"},
+  {key:"youth", label:"🧑 청년임대"},
+  {key:"auction", label:"🔨 경매·공매"},
   {key:"notices", label:"LH·SH 공고"},
   {key:"links", label:"🔎 매물 바로가기"},
 ];
@@ -303,7 +318,13 @@ function noticeCard(n){
 function renderTabs(){
   $("tabs").innerHTML = TABS.map(t => {
     if (t.key === "links" || t.key === "map") return `<button class="tab" role="tab" aria-selected="${t.key === tab}" data-k="${t.key}">${t.label}</button>`;
-    const items = (DATA[t.key] || []).filter(x => t.key !== "notices" ? (showOdd() || !x.odd) : x.wanted);
+    if (t.key === "youth" || t.key === "auction"){
+      const pool = t.key === "youth" ? (DATA.notices || []).filter(n => n.youth && n.wanted) : (DATA.auctions || []);
+      const cnt = t.key === "youth" ? (window.youthCount ? youthCount(DATA) : pool.length) : pool.length;
+      const nn = pool.filter(isNew).length;
+      return `<button class="tab" role="tab" aria-selected="${t.key === tab}" data-k="${t.key}">${t.label}<span class="n">${cnt}</span>${nn ? `<span class="nn">+${nn}</span>` : ""}</button>`;
+    }
+    const items = (DATA[t.key] || []).filter(x => t.key !== "notices" ? (showOdd() || !x.odd) : (x.wanted && x.source !== "청년안심주택"));
     const nn = items.filter(isNew).length;
     return `<button class="tab" role="tab" aria-selected="${t.key === tab}" data-k="${t.key}">${t.label}<span class="n">${items.length}</span>${nn ? `<span class="nn">+${nn}</span>` : ""}</button>`;
   }).join("");
@@ -314,8 +335,9 @@ function renderTabs(){
 }
 
 function fillFilters(){
-  $("filters").hidden = tab === "links" || tab === "map";
-  if (tab === "links" || tab === "map") return;
+  const custom = ["links", "map", "youth", "auction"].includes(tab);
+  $("filters").hidden = custom;
+  if (custom) return;
   const isN = tab === "notices";
   const items = DATA[tab] || [];
   const regions = [...new Set(items.map(x => isN ? x.source : x.region))];
@@ -333,6 +355,8 @@ function render(){
     if (window.renderMap) window.renderMap(DATA, $("list"), $("summary"));
     return;
   }
+  if (tab === "youth"){ if (window.renderYouth) renderYouth(DATA, $("list"), $("summary")); return; }
+  if (tab === "auction"){ if (window.renderAuction) renderAuction(DATA, $("list"), $("summary")); return; }
   if (tab === "links"){
     $("summary").textContent = "매일 알림 받고 → 역별 버튼으로 지금 나와 있는 매물 확인. 처음 한 번은 각 사이트에서 가격·면적 필터를 맞춰두세요.";
     $("list").innerHTML = STATIONS.map(stationCard).join("");
@@ -340,6 +364,7 @@ function render(){
   }
   const isN = tab === "notices";
   let items = [...(DATA[tab] || [])];
+  if (isN) items = items.filter(n => n.source !== "청년안심주택");   // 청년안심주택은 청년임대 탭에서
   const reg = $("f-region").value, typ = $("f-type").value;
   if (reg) items = items.filter(x => (isN ? x.source : x.region) === reg);
   if (typ && !isN) items = items.filter(x => x.htype === typ);
