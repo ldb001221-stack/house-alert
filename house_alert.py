@@ -87,6 +87,11 @@ def http_get(url: str, params: dict | None = None, timeout: int = 30) -> str:
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 charset = r.headers.get_content_charset() or "utf-8"
                 return r.read().decode(charset, "replace")
+        except urllib.error.HTTPError as e:
+            if 400 <= e.code < 500:   # 권한·요청 오류는 다시 해도 같아서 바로 알려요
+                raise RuntimeError(f"HTTP {e.code} (권한 없음 또는 잘못된 요청)")
+            last = e
+            time.sleep(2 + attempt * 3)
         except (urllib.error.URLError, TimeoutError) as e:
             last = e
             time.sleep(2 + attempt * 3)
@@ -343,6 +348,7 @@ def collect_sh() -> list[dict]:
             continue
         seq = m.group(1)
         title = html.unescape(re.sub(r"<[^>]+>|\s+", " ", m.group(2))).strip()
+        title = re.sub(r"^(NEW\s+)+", "", title).strip()   # 게시판이 붙이는 'NEW' 표시 제거
         date = re.search(r"(\d{4}-\d{2}-\d{2})", row)
         tds = re.findall(r"<td[^>]*>(.*?)</td>", row, re.S)
         dept = ""
@@ -360,6 +366,163 @@ def collect_sh() -> list[dict]:
             "url": SH_BASE + "view.do?" + urllib.parse.urlencode({"seq": seq}),
         })
     return out
+
+
+SOCO_LIST = "https://soco.seoul.go.kr/youth/pgm/home/yohome/bbsListJson.json"
+SOCO_VIEW = "https://soco.seoul.go.kr/youth/bbs/BMSR00015/view.do"
+SOCO_REFERER = "https://soco.seoul.go.kr/youth/bbs/BMSR00015/list.do?menuNo=400008"
+
+
+def collect_soco(cfg: dict) -> list[dict]:
+    """서울시 청년안심주택 모집공고 (서울주거포털 SOCO)."""
+    yc = cfg.get("youth", {})
+    pages = int(yc.get("soco_pages", 2))
+    fav = set(yc.get("soco_fav_gu_codes", []))
+    out = []
+
+    def fetch(page: int, gu: str = "") -> list[dict]:
+        body = urllib.parse.urlencode({"bbsId": "BMSR00015", "pageIndex": page, "searchAdresGu": gu,
+                                       "searchCondition": "", "searchKeyword": "", "optn2": "", "optn5": ""}).encode()
+        req = urllib.request.Request(SOCO_LIST, data=body, headers={"User-Agent": UA, "Referer": SOCO_REFERER})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return json.loads(r.read().decode("utf-8")).get("resultList", [])
+
+    fav_ids = set()
+    if fav:
+        for x in fetch(1, ",".join(sorted(fav))):
+            fav_ids.add(x.get("boardId"))
+    for p in range(1, pages + 1):
+        for x in fetch(p):
+            bid = x.get("boardId")
+            kind = {"1": "공공임대", "2": "민간임대"}.get(str(x.get("optn2")), "")
+            rnd = {"1": "최초모집", "2": "추가모집"}.get(str(x.get("optn5")), "")
+            out.append({
+                "id": f"SOCO|{bid}",
+                "source": "청년안심주택",
+                "title": (x.get("nttSj") or "").strip(),
+                "category": " · ".join(v for v in (kind, rnd) if v),
+                "status": "",
+                "date": x.get("optn1") or "",
+                "deadline": x.get("optn4") or "",      # 청약신청일
+                "org": x.get("optn3") or "",
+                "region": "관심 구" if bid in fav_ids else "서울",
+                "fav": bid in fav_ids,
+                "url": f"{SOCO_VIEW}?{urllib.parse.urlencode({'boardId': bid, 'menuNo': 400008})}",
+            })
+        time.sleep(0.5)
+    return out
+
+
+# 청년 대상 공고 구분 (제목 키워드 → 프로그램)
+YOUTH_PROGRAMS = [
+    ("청년안심주택", ("청년안심주택", "역세권 청년", "역세권청년")),
+    ("행복주택", ("행복주택",)),
+    ("청년 매입임대", ("청년 매입임대", "청년매입임대", "청년 매입", "기숙사형")),
+    ("청년 전세임대", ("청년 전세임대", "청년전세임대")),
+]
+YOUTH_WORDS = ("청년", "대학생", "사회초년생", "행복주택", "기숙사형")
+
+
+def tag_youth(n: dict) -> None:
+    t = n["title"]
+    prog = ""
+    if n["source"] == "청년안심주택":
+        prog = "청년안심주택"
+    else:
+        for name, words in YOUTH_PROGRAMS:
+            if any(w in t for w in words):
+                prog = name
+                break
+    n["program"] = prog
+    n["youth"] = bool(prog) or any(w in t for w in YOUTH_WORDS)
+
+
+# --------------------------------------------------------------------------
+# 온비드 공매 (한국자산관리공사, 공공데이터포털 API — 별도 활용신청 필요)
+# --------------------------------------------------------------------------
+ONBID_URL = "https://apis.data.go.kr/B010003/OnbidRlstListSrvc2/getRlstCltrList2"
+ONBID_PRPT = "0002,0003,0004,0005,0006,0007,0008,0010,0011"   # 재산유형 전체
+HOUSING_WORDS = ("주거", "아파트", "다세대", "연립", "오피스텔", "주택", "빌라", "다가구")
+
+
+def _won_to_man(v) -> int | None:
+    s = re.sub(r"[^\d]", "", str(v or ""))
+    return int(s) // 10000 if s else None
+
+
+def collect_onbid(cfg: dict, key: str) -> list[dict]:
+    ac = cfg.get("auction", {})
+    max_man = int(ac.get("max_price", 60000))
+    out: dict[str, dict] = {}
+    errors = []
+    for gu in ac.get("gus", []):
+        for pvct in ("N", "Y"):
+            page = 1
+            while page <= 5:
+                params = {
+                    "serviceKey": key, "pageNo": page, "numOfRows": 100, "resultType": "json",
+                    "prptDivCd": ONBID_PRPT, "pvctTrgtYn": pvct, "dspsMthodCd": "0001",
+                    "lctnSdnm": "서울특별시", "lctnSggnm": gu,
+                }
+                if not ac.get("include_share"):
+                    params["alcYn"] = "N"
+                text = http_get(ONBID_URL, params)
+                try:
+                    data = json.loads(text)
+                except json.JSONDecodeError:
+                    # 미승인 키 등은 XML 오류로 와요
+                    msg = re.search(r"<(?:returnAuthMsg|resultMsg|errMsg)>(.*?)<", text)
+                    raise RuntimeError(f"온비드 응답 오류: {msg.group(1) if msg else text[:150]}")
+                body = data.get("response", data).get("body", {}) if isinstance(data, dict) else {}
+                head = data.get("response", data).get("header", {}) if isinstance(data, dict) else {}
+                if str(head.get("resultCode", "00")) not in ("00", "000", "0"):
+                    raise RuntimeError(f"온비드 API 오류 {head.get('resultCode')}: {head.get('resultMsg')}")
+                items = body.get("items") or []
+                if isinstance(items, dict):
+                    items = items.get("item") or []
+                if isinstance(items, dict):
+                    items = [items]
+                for it in items:
+                    names = " ".join(str(it.get(k) or "") for k in
+                                     ("cltrUsgLclsCtgrNm", "cltrUsgMclsCtgrNm", "cltrUsgSclsCtgrNm", "onbidCltrNm"))
+                    if not any(w in names for w in HOUSING_WORDS):
+                        continue
+                    low = _won_to_man(it.get("lowstBidPrcIndctCont"))
+                    appr = _won_to_man(it.get("apslEvlAmt"))
+                    if low is not None and low > max_man:
+                        continue
+                    bld = _num(it.get("bldSqms"), 0) or 0
+                    rec = {
+                        "id": f"ONBID|{it.get('cltrMngNo')}|{it.get('pbctCdtnNo')}",
+                        "name": (it.get("onbidCltrNm") or "").strip(),
+                        "gu": gu,
+                        "dong": it.get("lctnEmdNm") or "",
+                        "use": it.get("cltrUsgSclsCtgrNm") or it.get("cltrUsgMclsCtgrNm") or "",
+                        "kind": it.get("prptDivNm") or "",
+                        "status": it.get("pbctStatNm") or "",
+                        "low": low, "low_text": it.get("lowstBidPrcIndctCont") or "",
+                        "appraisal": appr,
+                        "low_ratio": _num(it.get("apslPrcCtrsLowstBidRto")),
+                        "fails": _num(it.get("usbdNft"), 0),
+                        "bid_start": it.get("cltrBidBgngDt") or "",
+                        "bid_end": it.get("cltrBidEndDt") or "",
+                        "area": round(float(bld), 2), "pyeong": round(float(bld) / 3.3058, 1) if bld else 0,
+                        "share": it.get("alcYn") == "Y",
+                        "private_contract": it.get("pvctTrgtYn") == "Y",
+                        "org": it.get("orgNm") or "",
+                        "onbid_no": it.get("onbidCltrno") or "",
+                        "img": it.get("thnlImgUrlAdr") or "",
+                        "handover": it.get("evcRsbyTrgtCont") or "",
+                    }
+                    out[rec["id"]] = rec
+                total = _num(body.get("totalCount"), 0) or 0
+                if page * 100 >= total or not items:
+                    break
+                page += 1
+                time.sleep(0.3)
+    if errors:
+        raise RuntimeError("; ".join(errors))
+    return sorted(out.values(), key=lambda r: r["bid_end"] or "")
 
 
 def notice_wanted(n: dict, cfg: dict) -> bool:
@@ -384,6 +547,9 @@ def tg_call(token: str, method: str, params: dict) -> dict:
         return json.loads(e.read().decode() or "{}")
 
 
+SILENT = False   # --silent: 소리 없이 알림 (밤에 수동 실행할 때)
+
+
 def tg_send(secrets: dict, text: str) -> None:
     token, chat = secrets.get("TELEGRAM_TOKEN"), secrets.get("TELEGRAM_CHAT_ID")
     if not token or not chat:
@@ -399,7 +565,8 @@ def tg_send(secrets: dict, text: str) -> None:
         chunks.append(buf)
     for c in chunks:
         res = tg_call(token, "sendMessage", {"chat_id": chat, "text": c, "parse_mode": "HTML",
-                                             "disable_web_page_preview": "true"})
+                                             "disable_web_page_preview": "true",
+                                             "disable_notification": "true" if SILENT else "false"})
         if not res.get("ok"):
             print("[텔레그램] 전송 실패:", res.get("description"))
         time.sleep(0.5)
@@ -429,6 +596,15 @@ def deal_line(r: dict) -> str:
             f" · <a href=\"https://map.naver.com/p/search/{q}\">지도</a>")
 
 
+def fmt_dt(s: str) -> str:
+    """202611301700 → 11/30 17:00"""
+    s = re.sub(r"[^\d]", "", s or "")
+    if len(s) >= 8:
+        t = f"{int(s[4:6])}/{int(s[6:8])}"
+        return t + (f" {s[8:10]}:{s[10:12]}" if len(s) >= 12 else "")
+    return s
+
+
 def build_message(new: dict[str, list], secrets: dict, cfg: dict, status: dict, first_run: bool, totals: dict) -> str:
     site = secrets.get("SITE_URL", "")
     today = dt.datetime.now(KST).strftime("%Y-%m-%d")
@@ -449,11 +625,30 @@ def build_message(new: dict[str, list], secrets: dict, cfg: dict, status: dict, 
             lines += [deal_line(r) for r in items[:limit]]
             if len(items) > limit:
                 lines.append(f"   …외 {len(items) - limit}건은 웹사이트에서")
-        if new.get("notices"):
+        youth = [n for n in new.get("notices", []) if n.get("youth")]
+        other = [n for n in new.get("notices", []) if not n.get("youth")]
+        if youth:
             any_new = True
-            lines += ["", f"<b>📢 LH·SH 새 공고 ({len(new['notices'])}건)</b>"]
-            for n in new["notices"][:limit]:
+            lines += ["", f"<b>🧑 청년임대 새 공고 ({len(youth)}건)</b>"]
+            for n in sorted(youth, key=lambda n: not n.get("fav"))[:limit]:
+                extra = " · ".join(v for v in (n.get("program"), n.get("category"),
+                                              f"신청 {n['deadline']}" if n.get("deadline") else "") if v)
+                star = "⭐ " if n.get("fav") else ""
+                lines.append(f"• {star}[{html.escape(n['source'])}] <a href=\"{html.escape(n['url'])}\">{html.escape(n['title'])}</a>"
+                             + (f"\n   {html.escape(extra)}" if extra else ""))
+        if other:
+            any_new = True
+            lines += ["", f"<b>📢 LH·SH 새 공고 ({len(other)}건)</b>"]
+            for n in other[:limit]:
                 lines.append(f"• [{n['source']}] <a href=\"{html.escape(n['url'])}\">{html.escape(n['title'])}</a>")
+        if new.get("auctions"):
+            any_new = True
+            lines += ["", f"<b>🔨 새 공매 물건 ({len(new['auctions'])}건)</b>"]
+            for a in new["auctions"][:limit]:
+                low = money(a["low"]) if a.get("low") else (a.get("low_text") or "비공개")
+                ratio = f" (감정가의 {a['low_ratio']:.0f}%)" if a.get("low_ratio") else ""
+                lines.append(f"• <b>{html.escape(low)}</b>{ratio} | {html.escape(a['use'])} {html.escape(a['name'][:40])}\n"
+                             f"   유찰 {a.get('fails') or 0}회 · 입찰 {fmt_dt(a.get('bid_start'))}~{fmt_dt(a.get('bid_end'))} · 온비드 {html.escape(a.get('onbid_no') or '')}")
         if not any_new:
             lines.append("오늘은 조건에 맞는 새 항목이 없어요.")
         if new.get("odd"):
@@ -532,6 +727,28 @@ def run(send_telegram: bool = True) -> None:
             status["SH"] = {"ok": True, "count": len(sh)}
         except Exception as e:
             status["SH"] = {"ok": False, "errors": [str(e)], "error_count": 1}
+    if cfg.get("youth", {}).get("soco_enabled", True):
+        try:
+            soco = collect_soco(cfg)
+            notices += soco
+            status["청년안심주택"] = {"ok": True, "count": len(soco)}
+        except Exception as e:
+            status["청년안심주택"] = {"ok": False, "errors": [str(e)], "error_count": 1}
+    for n in notices:
+        tag_youth(n)
+
+    auctions: list[dict] = []
+    auction_ok = False
+    if cfg.get("auction", {}).get("enabled") and key:
+        try:
+            auctions = collect_onbid(cfg, key)
+            auction_ok = True
+            status["공매(온비드)"] = {"ok": True, "count": len(auctions)}
+        except Exception as e:
+            msg = str(e)[:200]
+            if "403" in msg or "SERVICE_KEY" in msg or "등록되지 않은" in msg:
+                msg = "온비드 API 활용신청이 필요해요 (공공데이터포털 '차세대 온비드 부동산 물건목록 조회서비스')"
+            status["공매(온비드)"] = {"ok": False, "errors": [msg], "error_count": 1, "setup": True}
 
     seen = load_json(SEEN_PATH, None)
     first_run = seen is None
@@ -543,12 +760,29 @@ def run(send_telegram: bool = True) -> None:
     prev = load_json(SITE_DATA_PATH, {})
     if not status.get("실거래가", {}).get("calls") and prev and not prev.get("demo"):
         deals = prev.get("sale", []) + prev.get("jeonse", []) + prev.get("wolse", [])
-    for src in ("LH", "SH"):
+    for src in ("LH", "SH", "청년안심주택"):
         if src in status and not status[src]["ok"] and prev and not prev.get("demo"):
             notices += [n for n in prev.get("notices", []) if n["source"] == src]
+    if not auction_ok and prev and not prev.get("demo"):
+        auctions = prev.get("auctions", [])
+
+    # 새로 추가된 출처는 처음 한 번은 조용히 '본 것'으로 기록 (알림 폭탄 방지)
+    yesterday = (now - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+
+    def quiet_first(prefix: str, ids: list[str]) -> None:
+        if not any(k.startswith(prefix) for k in seen):
+            for i in ids:
+                seen[i] = yesterday   # NEW 표시도 붙지 않게 '어제 본 것'으로
+    quiet_first("SOCO|", [n["id"] for n in notices if n["id"].startswith("SOCO|")])
+    quiet_first("ONBID|", [a["id"] for a in auctions])
 
     flag_odd(deals)
-    new: dict[str, list] = {"sale": [], "jeonse": [], "wolse": [], "notices": [], "odd": []}
+    new: dict[str, list] = {"sale": [], "jeonse": [], "wolse": [], "notices": [], "odd": [], "auctions": []}
+    for a in auctions:
+        a["first_seen"] = seen.get(a["id"], mark)
+        if a["id"] not in seen:
+            seen[a["id"]] = mark
+            new["auctions"].append(a)
     for r in deals:
         r["first_seen"] = seen.get(r["id"], mark)
         if r["id"] not in seen:
@@ -576,6 +810,8 @@ def run(send_telegram: bool = True) -> None:
         "status": status,
         **by_kind,
         "notices": notices,
+        "auctions": auctions,
+        "auction_enabled": bool(cfg.get("auction", {}).get("enabled")),
     }
     save_json(SITE_DATA_PATH, site_data)
     save_json(SEEN_PATH, seen)
@@ -583,7 +819,9 @@ def run(send_telegram: bool = True) -> None:
     totals = {k: len(v) for k, v in by_kind.items()}
     totals["notices"] = sum(1 for n in notices if n["wanted"])
     print(f"[완료] 매매 {totals['sale']} · 전세 {totals['jeonse']} · 월세 {totals['wolse']} · 공고 {len(notices)}"
-          f" | 신규 매매 {len(new['sale'])} 전세 {len(new['jeonse'])} 월세 {len(new['wolse'])} 공고 {len(new['notices'])}")
+          f" · 공매 {len(auctions)}"
+          f" | 신규 매매 {len(new['sale'])} 전세 {len(new['jeonse'])} 월세 {len(new['wolse'])} 공고 {len(new['notices'])}"
+          f" 공매 {len(new['auctions'])}")
     for k, v in status.items():
         if not v.get("ok"):
             print(f"[경고] {k}: {v.get('errors')}")
@@ -653,4 +891,5 @@ if __name__ == "__main__":
     elif "--telegram-test" in args:
         tg_send(load_secrets(), "✅ 집 알림 봇 연결 성공!")
     else:
+        SILENT = "--silent" in args
         run(send_telegram="--no-telegram" not in args)
