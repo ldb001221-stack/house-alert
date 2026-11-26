@@ -42,4 +42,5 @@ jobs:
           git config user.email "house-alert-bot@users.noreply.github.com"
           git add docs/data.json data/seen.json
           git diff --cached --quiet || git commit -m "데이터 갱신 $(date +'%Y-%m-%d')"
+          git pull --rebase -X theirs origin main || git pull --rebase origin main
           git push
